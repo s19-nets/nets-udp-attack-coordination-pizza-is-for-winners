@@ -1,10 +1,20 @@
 # nets-udp-attack-coordination
 
-Your task is create a program named attack.py.   Two instances of this
-program will negotiate with each other to determine on a future time
-of attack prior to attacking.
-Once an instance has determined its time of attack, it should print
-that time and terminate.
+Your task is create a program named attack.py.  It is to be used by
+two military battalians to coordinate a joint attack.  It's imperative
+that they attack at the same time, lest both groups lose battles sequentially.
+
+Two instances of this program will negotiate with each other to
+determine a future time of coordinated attack.  Once an instance has
+determined its time of attack, it should print that time and
+terminate.  It's critical that both instances agree on the same
+(future) time.
+
+An instance of Attack.py must inform its user if it fails to
+coordinate an attack time with the other instance.  While this is
+better than falsely reporting an incorrectly coordinated attack time,
+this event would nonetheless be considered a catasrophic failure.
+
 
 Attack should accept the parameters:
 -l <listen port>           -- specify port on which to listen
