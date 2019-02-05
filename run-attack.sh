@@ -4,7 +4,7 @@
 
 # start proxies
 proxy/udpProxy.py --clientPort 50010 --serverAddr localhost:50000 --pDelay 0.5 --pDrop 0.1 --pDup 0.1 --quiet &
-PR_PIDS=$!
+PR_PIDS=$!			# #! is the pid of the last process started
 proxy/udpProxy.py --clientPort 50011 --serverAddr localhost:50001 --pDelay 0.5 --pDrop 0.1 --pDup 0.1 --quiet &
 PR_PIDS="$PR_PIDS $!"
 

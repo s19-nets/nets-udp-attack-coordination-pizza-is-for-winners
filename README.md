@@ -17,8 +17,8 @@ this event would nonetheless be considered a catasrophic failure.
 
 
 Attack should accept the parameters:
--l <listen port>           -- specify port on which to listen
--s <send address:port>     -- specify address:port on which to send
+-l <listen address:port>           -- specify address:port on which to listen
+-s <send address:port>     -- specify address:port to which messages are sent
 -v                         -- print verbose (debugging) output
 
 For example, a session of attack could be run as follows:
