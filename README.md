@@ -17,6 +17,12 @@ $ ./attack.py -l localhost:50000 -s localhost:50001 &
 $ ./attack.py -s localhost:50000 -l localhost:50001 &
 $ wait
 
+Note that the file ./attack.py is a placeholder dummy program that
+(essentially) just prints the time.  Your task is to modify it to
+implement "coordinated attack" protocol.
+
+Students are encouraged to study the script ./run-attack.sh, which starts
+proxies, then runs attack, and then kills the proxies.
 
 # Important
 Note that, in the real world, UDP may arbitrarily delay or lose
