@@ -1,5 +1,7 @@
 """Message protocol implementation."""
-
+import socket
+import time
+import select
 
 class Packet_Manager:
     """Packet class."""
@@ -7,8 +9,8 @@ class Packet_Manager:
     def __init__(self, agent):
         """Initializes a packet according to an agent (client or server)."""
         self.agent = self._validate_agent(agent)  # Saves agent
-        self.received_msg = 0
-        self.sent_msg = 0
+        self.received_msg = 0  # last_ACKed
+        self.sent_msg = 0  # packet number
 
     def _get_agent(self):
         """Returns an agent for a packet (testing purposes)."""
@@ -25,9 +27,15 @@ class Packet_Manager:
     def get_available_messages(self):
         """Gets available messages for either server or client."""
         # Messages available for the server
-        server_msg = ["0, pong", "1, let's coordinate"]
+        server_msg = [
+            "0, pong", "1, the enemy is ready for battle",
+            "2, what is the best time for attack?", "3, 11?",
+            "4, 11 it is. Confirm"]
         # Messages available for the client
-        client_msg = ["0, ping", "1, let's coordinate an attack"]
+        client_msg = [
+            "0, ping", "1, let's coordinate an attack!",
+            "2, what about 11", "3, Yes 11",
+            "4, Confirmed 11"]
         if self.agent == "server":
             return server_msg
         return client_msg
@@ -97,6 +105,63 @@ class Packet_Manager:
             raise ValueError
 
 
+class Attack_Protocol:
+    """Attack protocol which will handle packet management."""
+
+    def __init__(self, agent, address=5002):
+        """Create a protocol according to an agent."""
+        self.pm = Packet_Manager(agent)  # This ensures correct agent
+        self.agent = self.pm.agent
+        self.server_address = ('localhost', address)
+        self.sock = self._create_socket()
+        # self.r_msg, self.r_addr = self.sock.recvfrom(2048)
+
+    def _create_socket(self):
+        """Creates a socket according to the agent. TODO add prints."""
+        if self.agent == "client":
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            return self.sock
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        server_address = ('localhost', self.server_address)
+        self.sock.bind(server_address)
+        return self.sock
+
+    def stop_and_wait(self, wait=5):
+        """Implements a stop and wait protocol."""
+        # Client will be sending messages and waiting for 'ACKS'
+        self.sock.setblocking(0)
+        if self.agent == "client":
+            # Send one message then wait for a response and continue.
+            # Will stop untill all messages are sent
+            for _x in self.pm.get_available_messages():
+                message = self.pm.send_next_message()
+                print("Sending Message:", message)
+                self.sock.sendto(str.encode(message), self.server_address)
+                # read_sock_func = {}  # Ready for reading
+                # read_sock_func[self.sock] = self.sock
+                #
+                # ready = select.select(
+                #     list(read_sock_func.keys()), [], [], wait)
+                # print(ready)
+                # if ready[0]:
+                #     print("Ready to receive")
+                #     data = self.sock.recv(4096)
+                #     print("Received Message:", data)
+                #     if data:
+                #         if self.pm.validate_received_message(data.decode()):
+                #             print("SUCCESS CONTINUE!")
+                #             return
+                #         print("Incorrect packet")
+                #     print("Waiting for data")
+                #     continue
+
+
+
+
+
+
+
+
 def _main():
     # Create a packet (manager) for a client
     # Create a packet (manager) for a server
@@ -131,4 +196,4 @@ def _main():
 
 
 # Run main function
-_main()
+# _main()
