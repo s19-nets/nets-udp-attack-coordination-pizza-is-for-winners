@@ -114,7 +114,7 @@ class Attack_Protocol:
         self.agent = self.pm.agent
         self.server_address = ('localhost', address)
         self.sock = self._create_socket()
-        # self.r_msg, self.r_addr = self.sock.recvfrom(2048)
+        print("Created sock", self.sock)
 
     def _create_socket(self):
         """Creates a socket according to the agent. TODO add prints."""
@@ -122,40 +122,56 @@ class Attack_Protocol:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             return self.sock
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        server_address = ('localhost', self.server_address)
-        self.sock.bind(server_address)
+        self.sock.bind(self.server_address)
         return self.sock
 
     def stop_and_wait(self, wait=5):
         """Implements a stop and wait protocol."""
-        # Client will be sending messages and waiting for 'ACKS'
-        self.sock.setblocking(0)
+        # self.sock.setblocking(0)
+
         if self.agent == "client":
             # Send one message then wait for a response and continue.
             # Will stop untill all messages are sent
-            for _x in self.pm.get_available_messages():
-                message = self.pm.send_next_message()
-                print("Sending Message:", message)
-                self.sock.sendto(str.encode(message), self.server_address)
-                # read_sock_func = {}  # Ready for reading
-                # read_sock_func[self.sock] = self.sock
-                #
-                # ready = select.select(
-                #     list(read_sock_func.keys()), [], [], wait)
-                # print(ready)
-                # if ready[0]:
-                #     print("Ready to receive")
-                #     data = self.sock.recv(4096)
-                #     print("Received Message:", data)
-                #     if data:
-                #         if self.pm.validate_received_message(data.decode()):
-                #             print("SUCCESS CONTINUE!")
-                #             return
-                #         print("Incorrect packet")
-                #     print("Waiting for data")
-                #     continue
+            # for _x in self.pm.get_available_messages():
+            #     message = self.pm.send_next_message()
+            message = "hi"
+            inout = [self.sock]
+            while 1:
+                time.sleep(1)
+                infds, outfds, errfds = select.select(inout, inout, [], 5)
+                if infds:
+                    buf = self.sock.recvfrom(1024)
+                    if buf:
+                        print('receive data:', buf)
+                if outfds:
+                    print("Sending Message:", message)
+                    self.sock.sendto(str.encode(message), self.server_address)
 
-
+        if self.agent == "server":
+            inputs = [self.sock]
+            while 1:
+                time.sleep(1)
+                infds, outfds, errfds = select.select(inputs, inputs, [], 5)
+                if infds:
+                    print(infds)
+                    for fds in infds:
+                        if fds is not self.sock:
+                            # clientsock, clientaddr = fds.accept()
+                            # inputs.append(clientsock)
+                            print('connect from:', "somewhere")
+                        else:
+                            # print 'enter data recv'
+                            data = fds.recvfrom(1024)
+                            print(data)
+                            if not data:
+                                inputs.remove(fds)
+                            else:
+                                print(data)
+                if outfds:
+                    for fds in outfds:
+                        msg = "Test"
+                        print("Sending message", msg)
+                        fds.sendto(str.encode(msg), self.server_address)
 
 
 
