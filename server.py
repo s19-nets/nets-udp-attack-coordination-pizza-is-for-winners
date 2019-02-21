@@ -1,20 +1,15 @@
-from socket import *
+"""Server to support pidgeon_attack protocol."""
 
+import socket
+import packet_manager
 
-def send_tcp():
-    s = socket(AF_INET,SOCK_STREAM)
-    s.connect(('localhost',8888))
-    data="TCP "*4
-    s.send(data)
-    s.close()
+# Create a protocol
+proto = packet_manager.Attack_Protocol("server")
+proto.stop_and_wait()
 
-
-def send_udp():
-    s = socket(AF_INET, SOCK_DGRAM)
-    data = "UDP "*4
-    s.sendto(data, ('localhost', 8888))
-    s.close()
-
-
-# UDP SEND
-send_udp()
+# # Create a packet manager
+# client = packet_manager.Packet_Manager("Client")
+#
+# for _x in client.get_available_messages():
+#     message = client.send_next_message()
+#     sock.sendto(str.encode(message), server_address)

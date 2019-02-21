@@ -2,11 +2,6 @@
 
 import socket
 import packet_manager
-# Create a socket and specify address
-# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-# server_address = ('localhost', 5002)
-# print("Client starting up on {} port {}".format(server_address[0],
-#                                                 server_address[1]))
 
 # Create a protocol
 proto = packet_manager.Attack_Protocol("client")

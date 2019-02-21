@@ -3,6 +3,7 @@ import socket
 import time
 import select
 
+
 class Packet_Manager:
     """Packet class."""
 
@@ -65,6 +66,14 @@ class Packet_Manager:
         self.sent_msg = message_num
         return True
 
+    def get_previous_sent_message(self):
+        """Returns previous sent message in the packet manager."""
+        try:
+            return self.get_available_messages()[self.sent_msg - 1]
+        except IndexError:
+            print("{} has sent all messages".format(self.agent))
+            return False
+
     def get_current_sent_message(self):
         """Returns current sent message in the packet manager."""
         try:
@@ -84,6 +93,11 @@ class Packet_Manager:
     def validate_received_message(self, message):
         """Validates that the received message is valid."""
         message = self._prepare_msg(message)
+        # Check if retry command was sent # Make this smart (send lastAcked)
+        if int(message[0]) == -1:
+            print("Retry command received, reset packets to", message[1])
+            self.set_send_msg(int(message[1]))
+            return True
         if int(message[0]) != self.received_msg:  # Looking for next messag
             print("This is not the expected message")
             print("Expected msg #{}, obtained msg #{}".format(
@@ -108,74 +122,148 @@ class Packet_Manager:
 class Attack_Protocol:
     """Attack protocol which will handle packet management."""
 
-    def __init__(self, agent, address=5002):
+    def __init__(self, agent, server_address=50002, client_address=50001):
         """Create a protocol according to an agent."""
         self.pm = Packet_Manager(agent)  # This ensures correct agent
         self.agent = self.pm.agent
-        self.server_address = ('localhost', address)
-        self.sock = self._create_socket()
-        print("Created sock", self.sock)
+        self.server_address = ('localhost', server_address)
+        self.client_address = ('localhost', client_address)
+        self.send_sock = self._create_send_socket()
+        self.recv_sock = self._create_recv_socket()
 
-    def _create_socket(self):
-        """Creates a socket according to the agent. TODO add prints."""
+    def _create_send_socket(self):
+        """Creates recv socket."""
+        return socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def _create_recv_socket(self):
+        """Creates a send socket with binding."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if self.agent == "client":
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            return self.sock
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(self.server_address)
-        return self.sock
+            sock.bind(self.client_address)
+        else:
+            sock.bind(self.server_address)
+        if not sock:
+            print("Couldn't bind sock")
+            return None   # Handle this
+        return sock
 
-    def stop_and_wait(self, wait=5):
+    def send_non_stop(self, wait=0):
+        """Sends packets expecting receival."""
+        pass
+
+    def stop_and_wait(self, wait=3):
         """Implements a stop and wait protocol."""
-        # self.sock.setblocking(0)
 
+        retries = 3
+
+        # Client will send first msg then wait for ack, and continue
+        while True:
+            time.sleep(wait)  # Or else the True goes too fast
+            read, send, errs = select.select(
+                [self.recv_sock], [self.send_sock], [], wait)
+
+            print("last ack{}, sent{}".format(
+                self.pm.received_msg, self.pm.sent_msg))
+
+            for s in read:
+                if self.finished():
+                    print("Messages have been finished, will not receive")
+                    return False
+
+                print("ready to read")  # Debugging
+                data, addr = s.recvfrom(2048)
+                if data:
+                    print(data)  # Debugging
+                    if self.recv(data):  # Validate data
+                        continue
+                    else:
+                        time.sleep(2)
+                        if retries > 0:
+                            retries = retries - 1
+                            continue
+                        retries = 5
+                        self.request_retry_send()
+                else:
+                    # No data received
+                    print("No data yet")
+
+
+            for s in send:
+                print("ready to send")
+                self.send()
+                if self.finished():
+                    print("Messages have been finished, will not send")
+                    return False
+
+            for s in errs:
+                print("ups there are some errors")
+
+    def request_retry_send(self):
+        """Will send all packets from the beggining again upon request."""
+        retry_msg = "-1, {}".format(self.pm.received_msg)
+        print("Sent retry message", retry_msg)
         if self.agent == "client":
-            # Send one message then wait for a response and continue.
-            # Will stop untill all messages are sent
-            # for _x in self.pm.get_available_messages():
-            #     message = self.pm.send_next_message()
-            message = "hi"
-            inout = [self.sock]
-            while 1:
-                time.sleep(1)
-                infds, outfds, errfds = select.select(inout, inout, [], 5)
-                if infds:
-                    buf = self.sock.recvfrom(1024)
-                    if buf:
-                        print('receive data:', buf)
-                if outfds:
-                    print("Sending Message:", message)
-                    self.sock.sendto(str.encode(message), self.server_address)
+            self.send_sock.sendto(retry_msg.encode(), self.server_address)
+            return True
+        if self.agent == "server":
+            self.send_sock.sendto(retry_msg.encode(), self.client_address)
+            return True
+        return False
+
+    def send(self):
+        """Send next message if ack was received."""
+        # Check that client and server are on sync
+        message = None
+        if not self.proceed_send():
+            # Resend message
+            if self.pm.received_msg != 0:
+                message = self.pm.get_previous_sent_message()
+        else:
+            # Send next message
+            message = self.pm.send_next_message()
+        if not message:
+            print("Messages not started or ended!")
+            return False
+        # Client
+        print("->Sending", message)
+        if self.agent == "client":
+            self.send_sock.sendto(message.encode(), self.server_address)
+        # Server
+        else:
+            self.send_sock.sendto(message.encode(), self.client_address)
+
+    def proceed_send(self):
+        """Will ensure that the client and the server are on sync."""
+        if self.agent == "client":
+            # First message case
+            if self.pm.received_msg == self.pm.sent_msg:
+                print("Sending first message")
+                return True
+            print("Waiting for confirmation")
+            return False
 
         if self.agent == "server":
-            inputs = [self.sock]
-            while 1:
-                time.sleep(1)
-                infds, outfds, errfds = select.select(inputs, inputs, [], 5)
-                if infds:
-                    print(infds)
-                    for fds in infds:
-                        if fds is not self.sock:
-                            # clientsock, clientaddr = fds.accept()
-                            # inputs.append(clientsock)
-                            print('connect from:', "somewhere")
-                        else:
-                            # print 'enter data recv'
-                            data = fds.recvfrom(1024)
-                            print(data)
-                            if not data:
-                                inputs.remove(fds)
-                            else:
-                                print(data)
-                if outfds:
-                    for fds in outfds:
-                        msg = "Test"
-                        print("Sending message", msg)
-                        fds.sendto(str.encode(msg), self.server_address)
+            # First message case
+            if self.pm.received_msg == self.pm.sent_msg:
+                print("Waiting for initial msg")
+                return False
+            return True
 
+        return False  # Something went terribly wrong
 
+    def recv(self, message):
+        """Validate received message."""
+        if self.pm.validate_received_message(message.decode()):
+            return True
+        return False
 
-
+    def finished(self):
+        """Check if the protocol has finished."""
+        num_messages = len(self.pm.get_available_messages())
+        if (num_messages == self.pm.sent_msg
+                and num_messages == self.pm.received_msg):
+            return True
+        return False
 
 
 def _main():
